@@ -23,12 +23,12 @@ enum Mode {
 #[derive(Debug, PartialEq)]
 enum TokenType {
     Identifier,
-    BinaryOprant,
-    UnaryOprant,
-    OpenParenthesis,
-    CloseParenthesis,
+    BinaryOp,
+    UnaryOp,
+    OpenParen,
+    CloseParen,
     Number,
-    None,
+    Start,
 }
 
 #[derive(Debug)]
@@ -45,27 +45,15 @@ impl Token {
         }
     }
 
-    fn update(&mut self, t: TokenType) {
-        self.typing = t;
-    }
-
     fn push(&mut self, c: char) {
         self.value.push(c);
     }
-
-    fn is(&self, typing: TokenType) -> bool {
-        if self.typing == typing {
-            return true;
-        } else {
-            return false;
-        }
-    }
 }
+
 
 fn main() {
     let args: Args = Args::parse();
     println!(">>> {} {:?} {:?}", args.pretty, args.mode, args.input);
-    
     
     let result: Vec<Token> = tokenize(args.input);
     for each in result {
@@ -76,12 +64,11 @@ fn main() {
 
 
 fn tokenize(line: String) -> Vec<Token> {
-    let mut parsed: Vec<Token> = Vec::new();
-    let mut none: Token = Token::new(TokenType::None);
-    parsed.push(Token::new(TokenType::None));
+    let mut parsed: Vec<Token> = vec![Token::new(TokenType::Start)];
 
     for c in line.chars() {
-        let prev: &mut Token = parsed.last_mut().unwrap_or(&mut none);
+        // this line will never panic since `parsed` is guaranteed to have at least one element
+        let prev: &mut Token = parsed.last_mut().expect("authored-by-FelysNeko");
 
         if c.is_ascii_alphabetic() {
             match prev.typing {
@@ -103,26 +90,41 @@ fn tokenize(line: String) -> Vec<Token> {
                 }
             }
         } else if c=='+' || c=='-' {
-            match prev.typing {
-                TokenType::BinaryOprant | 
-                TokenType::OpenParenthesis |
-                TokenType::None => {
-                    let mut new: Token = Token::new(TokenType::UnaryOprant);
-                    new.push(c);
-                    parsed.push(new);
-                }
-                _ => {
-                    let mut new: Token = Token::new(TokenType::BinaryOprant);
-                    new.push(c);
-                    parsed.push(new);
-                }
+            let mut new: Token = match prev.typing {
+                TokenType::UnaryOp |
+                TokenType::BinaryOp |
+                TokenType::OpenParen |
+                TokenType::Start => Token::new(TokenType::UnaryOp),
+                _ => Token::new(TokenType::BinaryOp),
+            };
+            new.push(c);
+            parsed.push(new);
+        }  else if c == '=' {
+            if prev.value==">" || prev.value=="=" || prev.value=="<" {
+                prev.push(c)
+            } else {
+                let mut new: Token = Token::new(TokenType::BinaryOp);
+                new.push(c);
+                parsed.push(new);
             }
-        } else if c=='*' || c=='/' {
-            let mut new: Token = Token::new(TokenType::BinaryOprant);
+        } else if c=='*' || c=='/' || c=='>' || c=='<'{
+            let mut new: Token = Token::new(TokenType::BinaryOp);
+            new.push(c);
+            parsed.push(new);
+        } else if c == '!' {
+            let mut new: Token = Token::new(TokenType::UnaryOp);
+            new.push(c);
+            parsed.push(new);
+        } else if c == '(' {
+            let mut new: Token = Token::new(TokenType::OpenParen);
+            new.push(c);
+            parsed.push(new);
+        } else if c == ')' {
+            let mut new: Token = Token::new(TokenType::CloseParen);
             new.push(c);
             parsed.push(new);
         }
     }
 
-    parsed
+    return parsed;
 }
