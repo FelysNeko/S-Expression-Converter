@@ -27,6 +27,8 @@ enum TokenType {
     UnaryOp,
     OpenParen,
     CloseParen,
+    FuncCall,
+    Comma,
     Number,
     Start,
 }
@@ -48,7 +50,12 @@ impl Token {
     fn push(&mut self, c: char) {
         self.value.push(c);
     }
+
+    fn update(&mut self, t: TokenType) {
+        self.typing = t;
+    }
 }
+
 
 
 fn main() {
@@ -89,6 +96,24 @@ fn tokenize(line: String) -> Vec<Token> {
                     parsed.push(new);
                 }
             }
+        } else if c == '=' {
+            if prev.value==">" || prev.value=="=" || prev.value=="<" || prev.value=="!"{
+                prev.update(TokenType::BinaryOp);
+                prev.push(c);
+            } else {
+                let mut new: Token = Token::new(TokenType::BinaryOp);
+                new.push(c);
+                parsed.push(new);
+            }
+        } else if c=='!' || c=='|' || c=='&' || c=='^' || c=='^'{
+            if prev.value == String::from(c) {
+                prev.update(TokenType::BinaryOp);
+                prev.push(c);
+            } else {
+                let mut new: Token = Token::new(TokenType::UnaryOp);
+                new.push(c);
+                parsed.push(new);
+            }
         } else if c=='+' || c=='-' {
             let mut new: Token = match prev.typing {
                 TokenType::UnaryOp |
@@ -99,30 +124,19 @@ fn tokenize(line: String) -> Vec<Token> {
             };
             new.push(c);
             parsed.push(new);
-        }  else if c == '=' {
-            if prev.value==">" || prev.value=="=" || prev.value=="<" {
-                prev.push(c)
-            } else {
-                let mut new: Token = Token::new(TokenType::BinaryOp);
-                new.push(c);
-                parsed.push(new);
-            }
-        } else if c=='*' || c=='/' || c=='>' || c=='<'{
+        } else if c=='*' || c=='/' || c=='>' || c=='<' {
             let mut new: Token = Token::new(TokenType::BinaryOp);
             new.push(c);
             parsed.push(new);
-        } else if c == '!' {
-            let mut new: Token = Token::new(TokenType::UnaryOp);
-            new.push(c);
-            parsed.push(new);
         } else if c == '(' {
-            let mut new: Token = Token::new(TokenType::OpenParen);
-            new.push(c);
-            parsed.push(new);
+            if prev.typing == TokenType::Identifier {
+                prev.update(TokenType::FuncCall);
+            }
+            parsed.push(Token::new(TokenType::OpenParen));
         } else if c == ')' {
-            let mut new: Token = Token::new(TokenType::CloseParen);
-            new.push(c);
-            parsed.push(new);
+            parsed.push(Token::new(TokenType::CloseParen));
+        } else if c == ',' {
+            parsed.push(Token::new(TokenType::Comma));
         }
     }
 
