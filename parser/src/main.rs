@@ -1,4 +1,4 @@
-use clap::{Parser, ValueEnum};
+use clap::{ Parser, ValueEnum };
 
 
 #[derive(Parser)]
@@ -30,7 +30,7 @@ enum TokenType {
     FuncCall,
     Comma,
     Number,
-    Start,
+    Null,
 }
 
 #[derive(Debug)]
@@ -57,25 +57,40 @@ impl Token {
 }
 
 
+struct Lexer {
+    data: Vec<Token>,
+}
+
+impl Lexer {
+    fn new(line: String) -> Self {
+        let mut result: Vec<Token> = tokenize(line);
+        result.reverse();
+        result.pop();
+        return Self {data: result};
+    }
+
+    fn next(&mut self) -> Option<Token> {
+        return self.data.pop();
+    }
+}
+
 
 fn main() {
     let args: Args = Args::parse();
     println!(">>> {} {:?} {:?}", args.pretty, args.mode, args.input);
     
-    let result: Vec<Token> = tokenize(args.input);
-    for each in result {
-        println!("{:?}", each);
+    let mut lexer: Lexer = Lexer::new(args.input);
+    while let Some(token) = lexer.next() {
+        println!("{:?}", token);
     }
-
 }
 
 
 fn tokenize(line: String) -> Vec<Token> {
-    let mut parsed: Vec<Token> = vec![Token::new(TokenType::Start)];
-
+    let mut result: Vec<Token> = vec![Token::new(TokenType::Null)];
     for c in line.chars() {
-        // this line will never panic since `parsed` is guaranteed to have at least one element
-        let prev: &mut Token = parsed.last_mut().expect("authored-by-FelysNeko");
+        // this line will never panic since `result` is guaranteed to have at least one element
+        let prev: &mut Token = result.last_mut().expect("authored-by-FelysNeko");
 
         if c.is_ascii_alphabetic() {
             match prev.typing {
@@ -83,7 +98,7 @@ fn tokenize(line: String) -> Vec<Token> {
                 _ => {
                     let mut new: Token = Token::new(TokenType::Identifier);
                     new.push(c);
-                    parsed.push(new);
+                    result.push(new);
                 }
             }
         } else if c.is_ascii_digit() || c=='.' {
@@ -93,7 +108,7 @@ fn tokenize(line: String) -> Vec<Token> {
                 _ => {
                     let mut new: Token = Token::new(TokenType::Number);
                     new.push(c);
-                    parsed.push(new);
+                    result.push(new);
                 }
             }
         } else if c == '=' {
@@ -103,7 +118,7 @@ fn tokenize(line: String) -> Vec<Token> {
             } else {
                 let mut new: Token = Token::new(TokenType::BinaryOp);
                 new.push(c);
-                parsed.push(new);
+                result.push(new);
             }
         } else if c=='!' || c=='|' || c=='&' || c=='^' || c=='^'{
             if prev.value == String::from(c) {
@@ -112,33 +127,33 @@ fn tokenize(line: String) -> Vec<Token> {
             } else {
                 let mut new: Token = Token::new(TokenType::UnaryOp);
                 new.push(c);
-                parsed.push(new);
+                result.push(new);
             }
         } else if c=='+' || c=='-' {
             let mut new: Token = match prev.typing {
                 TokenType::UnaryOp |
                 TokenType::BinaryOp |
                 TokenType::OpenParen |
-                TokenType::Start => Token::new(TokenType::UnaryOp),
+                TokenType::Null => Token::new(TokenType::UnaryOp),
                 _ => Token::new(TokenType::BinaryOp),
             };
             new.push(c);
-            parsed.push(new);
+            result.push(new);
         } else if c=='*' || c=='/' || c=='>' || c=='<' {
             let mut new: Token = Token::new(TokenType::BinaryOp);
             new.push(c);
-            parsed.push(new);
+            result.push(new);
         } else if c == '(' {
             if prev.typing == TokenType::Identifier {
                 prev.update(TokenType::FuncCall);
             }
-            parsed.push(Token::new(TokenType::OpenParen));
+            result.push(Token::new(TokenType::OpenParen));
         } else if c == ')' {
-            parsed.push(Token::new(TokenType::CloseParen));
+            result.push(Token::new(TokenType::CloseParen));
         } else if c == ',' {
-            parsed.push(Token::new(TokenType::Comma));
+            result.push(Token::new(TokenType::Comma));
         }
     }
 
-    return parsed;
+    return result;
 }
