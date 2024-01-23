@@ -7,6 +7,9 @@ struct Args {
     #[arg(short, long, help="prettier indented output")]
     pretty: bool,
 
+    #[arg(short, long, help="show debug information")]
+    debug: bool,
+
     #[arg(value_enum)]
     mode: Mode,
 
@@ -23,13 +26,13 @@ enum Mode {
 #[derive(Debug, PartialEq)]
 enum TokenType {
     Identifier,
-    BinaryOp,
-    UnaryOp,
+    BinaryOper,
+    UnaryOper,
     OpenParen,
     CloseParen,
     FuncCall,
-    Comma,
-    Number,
+    ParamSplit,
+    Numerical,
     Null,
 }
 
@@ -77,12 +80,22 @@ impl Lexer {
 
 fn main() {
     let args: Args = Args::parse();
-    println!(">>> {} {:?} {:?}", args.pretty, args.mode, args.input);
-    
-    let mut lexer: Lexer = Lexer::new(args.input);
-    while let Some(token) = lexer.next() {
-        println!("{:?}", token);
+    if args.debug == true {
+        println!("");
+        println!("Pretty: {}", args.pretty);
+        println!("Debug: {}", args.debug);
+        println!("Mode: {:?}", args.mode);
+        println!("Expr: {:?}", args.input);
     }
+
+    let mut lexer: Lexer = Lexer::new(args.input);
+    if args.debug == true {
+        println!("");
+        while let Some(token) = lexer.next() {
+            println!("+ {:?}\t{}", token.typing, token.value);
+        }
+    }
+
 }
 
 
@@ -104,54 +117,60 @@ fn tokenize(line: String) -> Vec<Token> {
         } else if c.is_ascii_digit() || c=='.' {
             match prev.typing {
                 TokenType::Identifier | 
-                TokenType::Number => prev.push(c),
+                TokenType::Numerical => prev.push(c),
                 _ => {
-                    let mut new: Token = Token::new(TokenType::Number);
+                    let mut new: Token = Token::new(TokenType::Numerical);
                     new.push(c);
                     result.push(new);
                 }
             }
         } else if c == '=' {
             if prev.value==">" || prev.value=="=" || prev.value=="<" || prev.value=="!"{
-                prev.update(TokenType::BinaryOp);
+                prev.update(TokenType::BinaryOper);
                 prev.push(c);
             } else {
-                let mut new: Token = Token::new(TokenType::BinaryOp);
+                let mut new: Token = Token::new(TokenType::BinaryOper);
                 new.push(c);
                 result.push(new);
             }
         } else if c=='!' || c=='|' || c=='&' || c=='^' || c=='^'{
             if prev.value == String::from(c) {
-                prev.update(TokenType::BinaryOp);
+                prev.update(TokenType::BinaryOper);
                 prev.push(c);
             } else {
-                let mut new: Token = Token::new(TokenType::UnaryOp);
+                let mut new: Token = Token::new(TokenType::UnaryOper);
                 new.push(c);
                 result.push(new);
             }
         } else if c=='+' || c=='-' {
             let mut new: Token = match prev.typing {
-                TokenType::UnaryOp |
-                TokenType::BinaryOp |
+                TokenType::UnaryOper |
+                TokenType::BinaryOper |
                 TokenType::OpenParen |
-                TokenType::Null => Token::new(TokenType::UnaryOp),
-                _ => Token::new(TokenType::BinaryOp),
+                TokenType::Null => Token::new(TokenType::UnaryOper),
+                _ => Token::new(TokenType::BinaryOper),
             };
             new.push(c);
             result.push(new);
         } else if c=='*' || c=='/' || c=='>' || c=='<' {
-            let mut new: Token = Token::new(TokenType::BinaryOp);
+            let mut new: Token = Token::new(TokenType::BinaryOper);
             new.push(c);
             result.push(new);
         } else if c == '(' {
             if prev.typing == TokenType::Identifier {
                 prev.update(TokenType::FuncCall);
             }
-            result.push(Token::new(TokenType::OpenParen));
+            let mut new: Token =Token::new(TokenType::OpenParen);
+            new.push(c);
+            result.push(new);
         } else if c == ')' {
-            result.push(Token::new(TokenType::CloseParen));
+            let mut new: Token =Token::new(TokenType::CloseParen);
+            new.push(c);
+            result.push(new);
         } else if c == ',' {
-            result.push(Token::new(TokenType::Comma));
+            let mut new: Token =Token::new(TokenType::ParamSplit);
+            new.push(c);
+            result.push(new);
         }
     }
 
