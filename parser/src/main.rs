@@ -1,3 +1,4 @@
+use std::process::exit;
 use clap::{ Parser, ValueEnum };
 
 
@@ -57,6 +58,10 @@ impl Token {
     fn update(&mut self, t: TokenType) {
         self.typing = t;
     }
+
+    fn null() -> Self {
+        Token::new(TokenType::Null)
+    }
 }
 
 
@@ -75,32 +80,123 @@ impl Lexer {
     fn next(&mut self) -> Option<Token> {
         return self.data.pop();
     }
+
+    fn push(&mut self, tk: Token) {
+        self.data.push(tk);
+    }
+}
+
+#[derive(Debug)]
+struct Node {
+    typing: TokenType,
+    value: String,
+    branch: Vec<Node>,
+}
+
+impl Node {
+    fn new(tk: Token) -> Self {
+        Self {
+            typing: tk.typing,
+            value: tk.value,
+            branch: Vec::new(),
+        }
+    }
+
+    fn push(&mut self, n: Node) {
+        self.branch.push(n);
+    }
+}
+
+
+struct ASTParser {
+    lexer: Lexer,
+}
+
+impl ASTParser {
+    fn new(lxr: Lexer) -> ASTParser {
+        ASTParser { lexer: lxr }
+    }
+
+    fn parse(&mut self) -> Node {
+        return self.compare();
+    }
+
+    fn compare(&mut self) -> Node {
+        let left: Node = self.add();
+        return left;
+    }
+
+    fn add(&mut self) -> Node {
+        let left: Node = self.multi();
+        return left;
+    }
+
+    fn multi(&mut self) -> Node {
+        let left: Node = self.unary();
+        return left;
+    }
+
+    fn unary(&mut self) -> Node {
+        if let Some(tk) = self.lexer.next() {
+            match tk.typing {
+                TokenType::UnaryOper => {
+                    let mut this: Node = Node::new(tk);
+                    this.push(self.primary());
+                    this
+                },
+                _ => {
+                    self.lexer.push(tk);
+                    self.primary()
+                },
+            }
+        } else {
+            exit(1);
+        }
+    }
+
+    fn primary(&mut self) -> Node {
+        if let Some(tk) = self.lexer.next() {
+            match tk.typing {
+                TokenType::Identifier |
+                TokenType::Numerical => Node::new(tk),
+                _ => {
+                    println!("Error at {}", tk.value);
+                    exit(1)
+                },
+            }
+        } else {
+            exit(1);
+        }
+    }
 }
 
 
 fn main() {
     let args: Args = Args::parse();
-    if args.debug == true {
-        println!("");
-        println!("Pretty: {}", args.pretty);
-        println!("Debug: {}", args.debug);
-        println!("Mode: {:?}", args.mode);
-        println!("Expr: {:?}", args.input);
-    }
+    // if args.debug == true {
+    //     println!("");
+    //     println!("Pretty: {}", args.pretty);
+    //     println!("Debug: {}", args.debug);
+    //     println!("Mode: {:?}", args.mode);
+    //     println!("Expr: {:?}", args.input);
+    // }
 
-    let mut lexer: Lexer = Lexer::new(args.input);
-    if args.debug == true {
-        println!("");
-        while let Some(token) = lexer.next() {
-            println!("+ {:?}\t{}", token.typing, token.value);
-        }
-    }
+    let lexer: Lexer = Lexer::new(args.input);
+    // if args.debug == true {
+    //     println!("");
+    //     while let Some(token) = lexer.next() {
+    //         println!("+ {:?}\t{}", token.typing, token.value);
+    //     }
+    // }
 
+    let mut parser: ASTParser = ASTParser::new(lexer);
+    let root = parser.parse();
+    println!("{:#?}", root);
 }
 
 
 fn tokenize(line: String) -> Vec<Token> {
-    let mut result: Vec<Token> = vec![Token::new(TokenType::Null)];
+    let mut result: Vec<Token> = vec![Token::null()];
     for c in line.chars() {
         // this line will never panic since `result` is guaranteed to have at least one element
         let prev: &mut Token = result.last_mut().expect("authored-by-FelysNeko");
@@ -133,7 +229,7 @@ fn tokenize(line: String) -> Vec<Token> {
                 new.push(c);
                 result.push(new);
             }
-        } else if c=='!' || c=='|' || c=='&' || c=='^' || c=='^'{
+        } else if c=='!' || c=='|' || c=='&' || c=='^' || c=='~'{
             if prev.value == String::from(c) {
                 prev.update(TokenType::BinaryOper);
                 prev.push(c);
