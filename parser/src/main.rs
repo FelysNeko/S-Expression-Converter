@@ -18,13 +18,15 @@ struct Args {
     input: String,
 }
 
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum Mode {
     Expr,
     File,
 }
 
-#[derive(Debug, PartialEq)]
+
+#[derive(Debug, PartialEq, Clone)]
 enum TokenType {
     Identifier,
     BinaryOper,
@@ -37,11 +39,55 @@ enum TokenType {
     Null,
 }
 
-#[derive(Debug)]
+
+#[derive(Debug, Clone)]
 struct Token {
     typing: TokenType,
     value: String,
 }
+
+
+struct Lexer {
+    data: Vec<Token>,
+}
+
+
+#[derive(Debug, Clone)]
+struct Node {
+    typing: TokenType,
+    value: String,
+    branch: Vec<Node>,
+}
+
+
+struct ASTParser {
+    lexer: Lexer,
+}
+
+
+fn main() {
+    let args: Args = Args::parse();
+    if args.debug == true {
+        println!("");
+        println!("Pretty: {}", args.pretty);
+        println!("Debug: {}", args.debug);
+        println!("Mode: {:?}", args.mode);
+        println!("Expr: {:?}", args.input);
+    }
+
+    let lexer: Lexer = Lexer::new(args.input);
+    // if args.debug == true {
+    //     println!("");
+    //     while let Some(token) = lexer.next() {
+    //         println!("+ {:?}\t{}", token.typing, token.value);
+    //     }
+    // }
+
+    let mut parser: ASTParser = ASTParser::new(lexer);
+    let root = parser.parse();
+    println!("{:#?}", root);
+}
+
 
 impl Token {
     fn new(t: TokenType) -> Self {
@@ -65,20 +111,16 @@ impl Token {
 }
 
 
-struct Lexer {
-    data: Vec<Token>,
-}
-
 impl Lexer {
     fn new(line: String) -> Self {
         let mut result: Vec<Token> = tokenize(line);
         result.reverse();
         result.pop();
-        return Self {data: result};
+        Self {data: result}
     }
 
     fn next(&mut self) -> Option<Token> {
-        return self.data.pop();
+        self.data.pop()
     }
 
     fn push(&mut self, tk: Token) {
@@ -86,12 +128,6 @@ impl Lexer {
     }
 }
 
-#[derive(Debug)]
-struct Node {
-    typing: TokenType,
-    value: String,
-    branch: Vec<Node>,
-}
 
 impl Node {
     fn new(tk: Token) -> Self {
@@ -108,32 +144,84 @@ impl Node {
 }
 
 
-struct ASTParser {
-    lexer: Lexer,
-}
-
 impl ASTParser {
     fn new(lxr: Lexer) -> ASTParser {
         ASTParser { lexer: lxr }
     }
 
     fn parse(&mut self) -> Node {
-        return self.compare();
+        self.assign()
+    }
+
+    fn assign(&mut self) -> Node {
+        let mut left: Node = self.compare();
+        while let Some(tk) = self.lexer.next() {
+            if left.typing != TokenType::Identifier {
+                println!("Error at {}", tk.value);
+                exit(1);
+            }
+            if tk.value == "="{
+                let mut temp = Node::new(tk);
+                temp.push(left.clone());
+                temp.push(self.compare());
+                left = temp;
+            } else {
+                self.lexer.push(tk);
+                break;
+            }
+        }
+        left
     }
 
     fn compare(&mut self) -> Node {
-        let left: Node = self.add();
-        return left;
+        let mut left: Node = self.add();
+        while let Some(tk) = self.lexer.next() {
+            if 
+                tk.value==">" || tk.value==">=" || tk.value=="==" || 
+                tk.value=="<" || tk.value=="<=" || tk.value=="!=" 
+            {
+                let mut temp = Node::new(tk);
+                temp.push(left.clone());
+                temp.push(self.add());
+                left = temp;
+            } else {
+                self.lexer.push(tk);
+                break;
+            }
+        }
+        left
     }
 
     fn add(&mut self) -> Node {
-        let left: Node = self.multi();
-        return left;
+        let mut left: Node = self.multi();
+        while let Some(tk) = self.lexer.next() {
+            if tk.value=="+" || tk.value=="-" {
+                let mut temp = Node::new(tk);
+                temp.push(left.clone());
+                temp.push(self.multi());
+                left = temp;
+            } else {
+                self.lexer.push(tk);
+                break;
+            }
+        }
+        left
     }
 
     fn multi(&mut self) -> Node {
-        let left: Node = self.unary();
-        return left;
+        let mut left: Node = self.unary();
+        while let Some(tk) = self.lexer.next() {
+            if tk.value=="*" || tk.value=="/" || tk.value=="%" {
+                let mut temp = Node::new(tk);
+                temp.push(left.clone());
+                temp.push(self.unary());
+                left = temp;
+            } else {
+                self.lexer.push(tk);
+                break;
+            }
+        }
+        left
     }
 
     fn unary(&mut self) -> Node {
@@ -168,30 +256,6 @@ impl ASTParser {
             exit(1);
         }
     }
-}
-
-
-fn main() {
-    let args: Args = Args::parse();
-    // if args.debug == true {
-    //     println!("");
-    //     println!("Pretty: {}", args.pretty);
-    //     println!("Debug: {}", args.debug);
-    //     println!("Mode: {:?}", args.mode);
-    //     println!("Expr: {:?}", args.input);
-    // }
-
-    let lexer: Lexer = Lexer::new(args.input);
-    // if args.debug == true {
-    //     println!("");
-    //     while let Some(token) = lexer.next() {
-    //         println!("+ {:?}\t{}", token.typing, token.value);
-    //     }
-    // }
-
-    let mut parser: ASTParser = ASTParser::new(lexer);
-    let root = parser.parse();
-    println!("{:#?}", root);
 }
 
 
@@ -248,7 +312,7 @@ fn tokenize(line: String) -> Vec<Token> {
             };
             new.push(c);
             result.push(new);
-        } else if c=='*' || c=='/' || c=='>' || c=='<' {
+        } else if c=='*' || c=='/' || c=='>' || c=='<' || c=='%'{
             let mut new: Token = Token::new(TokenType::BinaryOper);
             new.push(c);
             result.push(new);
@@ -270,5 +334,5 @@ fn tokenize(line: String) -> Vec<Token> {
         }
     }
 
-    return result;
+    result
 }
