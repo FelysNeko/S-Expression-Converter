@@ -118,7 +118,8 @@ impl ast::Parser {
         if let Some(tk) = self.lexer.next() {
             match tk.typing {
                 ast::TokenType::Identifier |
-                ast::TokenType::Numerical => ast::Node::new(tk),
+                ast::TokenType::Numerical | 
+                ast::TokenType::StringVar => ast::Node::new(tk),
                 ast::TokenType::OpenParen => {
                     let node = self.parse();
                     self.lexer.next();
@@ -155,7 +156,11 @@ impl ast::Parser {
 
 impl fmt::Display for ast::Node {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.typing!=ast::TokenType::Identifier && self.typing!=ast::TokenType::Numerical {
+        if 
+            self.typing != ast::TokenType::Identifier && 
+            self.typing != ast::TokenType::Numerical &&
+            self.typing != ast::TokenType::StringVar
+        {
             write!(f, "( ")?;
         }
         
@@ -164,7 +169,11 @@ impl fmt::Display for ast::Node {
             write!(f, "{}", each)?
         }
 
-        if self.typing!=ast::TokenType::Identifier && self.typing!=ast::TokenType::Numerical {
+        if 
+            self.typing != ast::TokenType::Identifier && 
+            self.typing != ast::TokenType::Numerical &&
+            self.typing != ast::TokenType::StringVar
+        {
             write!(f, ") ")?;
         }
         Ok(())

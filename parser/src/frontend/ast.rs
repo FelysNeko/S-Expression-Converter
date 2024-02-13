@@ -8,6 +8,7 @@ pub enum TokenType {
     FuncCall,
     ParamSplit,
     Numerical,
+    StringVar,
     Null,
 }
 

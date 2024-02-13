@@ -57,7 +57,12 @@ fn tokenize(line: String) -> Vec<ast::Token> {
         // this line will never panic since `result` is guaranteed to have at least one element
         let prev: &mut ast::Token = result.last_mut().expect("authored-by-FelysNeko");
 
-        if c.is_ascii_alphabetic() {
+        if 
+            prev.typing == ast::TokenType::StringVar && 
+            (prev.value.len()==1 || !prev.value.ends_with('\"'))
+        {
+            prev.push(c);
+        } else if c.is_ascii_alphabetic() {
             match prev.typing {
                 ast::TokenType::Identifier => prev.push(c),
                 _ => {
@@ -104,6 +109,10 @@ fn tokenize(line: String) -> Vec<ast::Token> {
             };
             new.push(c);
             result.push(new);
+        } else if c == '\"' {
+            let mut new: ast::Token = ast::Token::new(ast::TokenType::StringVar);
+            new.push(c);
+            result.push(new);           
         } else if c=='*' || c=='/' || c=='>' || c=='<' || c=='%'{
             let mut new: ast::Token = ast::Token::new(ast::TokenType::BinaryOper);
             new.push(c);
