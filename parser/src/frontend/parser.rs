@@ -27,21 +27,19 @@ impl ast::Parser {
     }
 
     fn assign(&mut self) -> ast::Node {
-        let mut left: ast::Node = self.compare();
-        while let Some(tk) = self.lexer.next() {
+        let left: ast::Node = self.compare();
+        if let Some(tk) = self.lexer.next() {
             if tk.value == "=" {
                 if left.typing != ast::TokenType::Identifier {
                     println!("Error at {:?}", ast::TokenType::BinaryOper);
                     exit(1);
                 }
                 let mut temp = ast::Node::new(tk);
-                temp.push(left.clone());
-                temp.push(self.compare());
-                left = temp;
-            } else {
-                self.lexer.push(tk);
-                break;
+                temp.push(left);
+                temp.push(self.assign());
+                return temp;
             }
+            self.lexer.push(tk);
         }
         left
     }
