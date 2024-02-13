@@ -1,13 +1,11 @@
 use std::process::exit;
+use std::fmt;
 use clap::{ Parser, ValueEnum };
 
 
 #[derive(Parser)]
 #[command(about="S-Expression Converter")]
 struct Args {
-    #[arg(short, long, help="prettier indented output")]
-    pretty: bool,
-
     #[arg(short, long, help="show debug information")]
     debug: bool,
 
@@ -69,23 +67,26 @@ fn main() {
     let args: Args = Args::parse();
     if args.debug == true {
         println!("");
-        println!("Pretty: {}", args.pretty);
         println!("Debug: {}", args.debug);
         println!("Mode: {:?}", args.mode);
         println!("Expr: {:?}", args.input);
     }
 
     let lexer: Lexer = Lexer::new(args.input);
-    // if args.debug == true {
-    //     println!("");
-    //     while let Some(token) = lexer.next() {
-    //         println!("+ {:?}\t{}", token.typing, token.value);
-    //     }
-    // }
+    if args.debug == true {
+        println!("");
+        println!("{}", lexer);
+    }
 
     let mut parser: ASTParser = ASTParser::new(lexer);
     let root = parser.parse();
-    println!("{:#?}", root);
+    if args.debug == true {
+        println!("");
+        println!("{:#?}", root);
+        println!("");
+    }
+
+    println!("{}", root);
 }
 
 
@@ -156,11 +157,11 @@ impl ASTParser {
     fn assign(&mut self) -> Node {
         let mut left: Node = self.compare();
         while let Some(tk) = self.lexer.next() {
-            if left.typing != TokenType::Identifier {
-                println!("Error at {}", tk.value);
-                exit(1);
-            }
-            if tk.value == "="{
+            if tk.value == "=" {
+                if left.typing != TokenType::Identifier {
+                    println!("Error at {:?}", TokenType::BinaryOper);
+                    exit(1);
+                }
                 let mut temp = Node::new(tk);
                 temp.push(left.clone());
                 temp.push(self.compare());
@@ -229,7 +230,7 @@ impl ASTParser {
             match tk.typing {
                 TokenType::UnaryOper => {
                     let mut this: Node = Node::new(tk);
-                    this.push(self.primary());
+                    this.push(self.unary());
                     this
                 },
                 _ => {
@@ -238,6 +239,7 @@ impl ASTParser {
                 },
             }
         } else {
+            println!("Error: {:?}", TokenType::Null);
             exit(1);
         }
     }
@@ -247,12 +249,34 @@ impl ASTParser {
             match tk.typing {
                 TokenType::Identifier |
                 TokenType::Numerical => Node::new(tk),
+                TokenType::OpenParen => {
+                    let node = self.parse();
+                    self.lexer.next();
+                    node
+                },
+                TokenType::FuncCall => {
+                    let mut node = Node::new(tk);
+                    self.lexer.next();
+                    while let Some(tk) = self.lexer.next() {
+                        if tk.typing == TokenType::CloseParen {
+                            return node;
+                        }
+                        if tk.typing == TokenType::ParamSplit {
+                            continue;
+                        }
+                        self.lexer.push(tk);
+                        node.push(self.parse());
+                    }
+                    println!("Expect: {:?} or {:?}", TokenType::CloseParen, TokenType::ParamSplit);
+                    exit(1);
+                }
                 _ => {
-                    println!("Error at {}", tk.value);
+                    println!("Unexpected Error");
                     exit(1)
                 },
             }
         } else {
+            println!("Error: {:?}", TokenType::Null);
             exit(1);
         }
     }
@@ -333,6 +357,34 @@ fn tokenize(line: String) -> Vec<Token> {
             result.push(new);
         }
     }
-
     result
+}
+
+
+impl fmt::Display for Lexer {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for each in self.data.iter().rev() {
+            writeln!(f, "{:?}\t{}", each.typing, each.value)?
+        }
+        Ok(())
+    }
+}
+
+
+impl fmt::Display for Node {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.typing!=TokenType::Identifier && self.typing!=TokenType::Numerical {
+            write!(f, "( ")?;
+        }
+        
+        write!(f, "{} ", self.value)?;
+        for each in self.branch.iter() {
+            write!(f, "{}", each)?
+        }
+
+        if self.typing!=TokenType::Identifier && self.typing!=TokenType::Numerical {
+            write!(f, ") ")?;
+        }
+        Ok(())
+    }
 }
