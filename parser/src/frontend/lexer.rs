@@ -2,33 +2,35 @@ use crate::frontend::ast;
 use std::fmt;
 
 impl ast::Token {
-    fn new(t: ast::TokenType) -> Self {
+    fn new(t: ast::TokenType, s:usize) -> Self {
         Self {
             typing: t,
             value: String::new(),
+            loc: (s, s)
         }
     }
 
     fn push(&mut self, c: char) {
         self.value.push(c);
+        self.loc.1 += 1;
     }
 
     fn update(&mut self, t: ast::TokenType) {
         self.typing = t;
     }
 
-    fn null() -> Self {
-        ast::Token::new(ast::TokenType::Null)
+    pub fn null() -> Self {
+        ast::Token::new(ast::TokenType::Null, 0)
     }
 }
 
 
 impl ast::Lexer {
     pub fn new(line: String) -> Self {
-        let mut result: Vec<ast::Token> = tokenize(line);
+        let mut result: Vec<ast::Token> = tokenize(&line);
         result.reverse();
         result.pop();
-        Self {data: result}
+        Self {line, data: result}
     }
 
     pub fn next(&mut self) -> Option<ast::Token> {
@@ -41,19 +43,26 @@ impl ast::Lexer {
 }
 
 
+impl fmt::Display for ast::Token {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}\t{}\t{}\t{}", self.typing, self.loc.0, self.loc.1, self.value)
+    }
+}
+
+
 impl fmt::Display for ast::Lexer {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for each in self.data.iter().rev() {
-            writeln!(f, "{:?}\t{}", each.typing, each.value)?
+            writeln!(f, "{}", each)?
         }
         Ok(())
     }
 }
 
 
-fn tokenize(line: String) -> Vec<ast::Token> {
+fn tokenize(line: &String) -> Vec<ast::Token> {
     let mut result: Vec<ast::Token> = vec![ast::Token::null()];
-    for c in line.chars() {
+    for (i, c) in line.chars().enumerate() {
         // this line will never panic since `result` is guaranteed to have at least one element
         let prev: &mut ast::Token = result.last_mut().expect("authored-by-FelysNeko");
 
@@ -66,7 +75,7 @@ fn tokenize(line: String) -> Vec<ast::Token> {
             match prev.typing {
                 ast::TokenType::Identifier => prev.push(c),
                 _ => {
-                    let mut new: ast::Token = ast::Token::new(ast::TokenType::Identifier);
+                    let mut new: ast::Token = ast::Token::new(ast::TokenType::Identifier, i);
                     new.push(c);
                     result.push(new);
                 }
@@ -76,7 +85,7 @@ fn tokenize(line: String) -> Vec<ast::Token> {
                 ast::TokenType::Identifier | 
                 ast::TokenType::Numerical => prev.push(c),
                 _ => {
-                    let mut new: ast::Token = ast::Token::new(ast::TokenType::Numerical);
+                    let mut new: ast::Token = ast::Token::new(ast::TokenType::Numerical, i);
                     new.push(c);
                     result.push(new);
                 }
@@ -86,16 +95,16 @@ fn tokenize(line: String) -> Vec<ast::Token> {
                 prev.update(ast::TokenType::BinaryOper);
                 prev.push(c);
             } else {
-                let mut new: ast::Token = ast::Token::new(ast::TokenType::BinaryOper);
+                let mut new: ast::Token = ast::Token::new(ast::TokenType::BinaryOper, i);
                 new.push(c);
                 result.push(new);
             }
-        } else if c=='!' || c=='|' || c=='&' || c=='^' || c=='~'{
+        } else if c=='|' || c=='&'{
             if prev.value == String::from(c) {
                 prev.update(ast::TokenType::BinaryOper);
                 prev.push(c);
             } else {
-                let mut new: ast::Token = ast::Token::new(ast::TokenType::UnaryOper);
+                let mut new: ast::Token = ast::Token::new(ast::TokenType::UnaryOper, i);
                 new.push(c);
                 result.push(new);
             }
@@ -104,32 +113,36 @@ fn tokenize(line: String) -> Vec<ast::Token> {
                 ast::TokenType::UnaryOper |
                 ast::TokenType::BinaryOper |
                 ast::TokenType::OpenParen |
-                ast::TokenType::Null => ast::Token::new(ast::TokenType::UnaryOper),
-                _ => ast::Token::new(ast::TokenType::BinaryOper),
+                ast::TokenType::Null => ast::Token::new(ast::TokenType::UnaryOper, i),
+                _ => ast::Token::new(ast::TokenType::BinaryOper, i),
             };
             new.push(c);
             result.push(new);
         } else if c == '\"' {
-            let mut new: ast::Token = ast::Token::new(ast::TokenType::StringVar);
+            let mut new: ast::Token = ast::Token::new(ast::TokenType::StringVar, i);
             new.push(c);
             result.push(new);           
         } else if c=='*' || c=='/' || c=='>' || c=='<' || c=='%'{
-            let mut new: ast::Token = ast::Token::new(ast::TokenType::BinaryOper);
+            let mut new: ast::Token = ast::Token::new(ast::TokenType::BinaryOper, i);
             new.push(c);
             result.push(new);
         } else if c == '(' {
             if prev.typing == ast::TokenType::Identifier {
                 prev.update(ast::TokenType::FuncCall);
             }
-            let mut new: ast::Token =ast::Token::new(ast::TokenType::OpenParen);
+            let mut new: ast::Token =ast::Token::new(ast::TokenType::OpenParen, i);
             new.push(c);
             result.push(new);
         } else if c == ')' {
-            let mut new: ast::Token =ast::Token::new(ast::TokenType::CloseParen);
+            let mut new: ast::Token =ast::Token::new(ast::TokenType::CloseParen, i);
             new.push(c);
             result.push(new);
         } else if c == ',' {
-            let mut new: ast::Token =ast::Token::new(ast::TokenType::ParamSplit);
+            let mut new: ast::Token =ast::Token::new(ast::TokenType::ParamSplit, i);
+            new.push(c);
+            result.push(new);
+        } else if c=='!' || c=='~' || c=='^'{
+            let mut new: ast::Token = ast::Token::new(ast::TokenType::UnaryOper, i);
             new.push(c);
             result.push(new);
         }

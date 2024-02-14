@@ -1,4 +1,5 @@
 use crate::frontend::ast;
+use colored::Colorize;
 use std::process::exit;
 use std::fmt;
 
@@ -18,12 +19,38 @@ impl ast::Node {
 
 
 impl ast::Parser {
-    pub fn new(lxr: ast::Lexer) -> ast::Parser {
-        ast::Parser { lexer: lxr }
+    pub fn new(lxr: ast::Lexer) -> Self {
+        Self { lexer: lxr }
     }
 
     pub fn parse(&mut self) -> ast::Node {
         self.assign()
+    }
+
+    fn warn(&self, tk: ast::Token) -> ! {
+        let start: usize;
+        let end: usize;
+
+        if tk.typing == ast::TokenType::Null {
+            start = self.lexer.line.len();
+            end = start + 1;
+        } else {
+            start = tk.loc.0;
+            end = tk.loc.1;
+        }
+        
+        println!("");
+        println!("{}", self.lexer.line);
+        for _ in 0..start {
+            print!(" ");
+        }
+        for _ in start..end {
+            print!("{}", "^".red().bold());
+        }
+        println!(" {}", "ERROR".red().bold());
+        println!("");
+
+        exit(1);
     }
 
     fn assign(&mut self) -> ast::Node {
@@ -31,8 +58,7 @@ impl ast::Parser {
         if let Some(tk) = self.lexer.next() {
             if tk.value == "=" {
                 if left.typing != ast::TokenType::Identifier {
-                    println!("Error at {:?}", ast::TokenType::BinaryOper);
-                    exit(1);
+                    self.warn(tk);
                 }
                 let mut temp = ast::Node::new(tk);
                 temp.push(left);
@@ -109,8 +135,7 @@ impl ast::Parser {
                 },
             }
         } else {
-            println!("Error: {:?}", ast::TokenType::Null);
-            exit(1);
+            self.warn(ast::Token::null());
         }
     }
 
@@ -126,7 +151,7 @@ impl ast::Parser {
                     node
                 },
                 ast::TokenType::FuncCall => {
-                    let mut node = ast::Node::new(tk);
+                    let mut node = ast::Node::new(tk.clone());
                     self.lexer.next();
                     while let Some(tk) = self.lexer.next() {
                         if tk.typing == ast::TokenType::CloseParen {
@@ -138,17 +163,14 @@ impl ast::Parser {
                         self.lexer.push(tk);
                         node.push(self.parse());
                     }
-                    println!("Expect: {:?} or {:?}", ast::TokenType::CloseParen, ast::TokenType::ParamSplit);
-                    exit(1);
+                    self.warn(tk);
                 }
                 _ => {
-                    println!("Unexpected Error");
-                    exit(1)
+                    self.warn(tk);
                 },
             }
         } else {
-            println!("Error: {:?}", ast::TokenType::Null);
-            exit(1);
+            self.warn(ast::Token::null());
         }
     }
 }

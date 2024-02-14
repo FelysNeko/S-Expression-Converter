@@ -17,10 +17,12 @@ pub enum TokenType {
 pub struct Token {
     pub typing: TokenType,
     pub value: String,
+    pub loc: (usize, usize),
 }
 
 
 pub struct Lexer {
+    pub line: String,
     pub data: Vec<Token>,
 }
 

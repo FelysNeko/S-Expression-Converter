@@ -1,4 +1,4 @@
-use clap::{ Parser, ValueEnum };
+use clap::Parser;
 use crate::frontend::ast;
 mod frontend;
 
@@ -9,18 +9,8 @@ struct Args {
     #[arg(short, long, help="show debug information")]
     debug: bool,
 
-    #[arg(value_enum)]
-    mode: Mode,
-
     #[arg(help="expression or file path depends on your mode")]
     input: String,
-}
-
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
-enum Mode {
-    Expr,
-    File,
 }
 
 
@@ -29,13 +19,13 @@ fn main() {
     if args.debug == true {
         println!("");
         println!("Debug: {}", args.debug);
-        println!("Mode: {:?}", args.mode);
         println!("Expr: {:?}", args.input);
     }
 
     let lexer: ast::Lexer = ast::Lexer::new(args.input);
     if args.debug == true {
         println!("");
+        println!("TokenType\tStart\tEnd\tValue");
         println!("{}", lexer);
     }
 
